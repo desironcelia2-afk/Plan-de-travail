@@ -1,5 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ClassPickerPage from "@/pages/ClassPickerPage";
 import HomePage from "@/pages/HomePage";
 import ChildWorkshopsPage from "@/pages/ChildWorkshopsPage";
 import AdminPage from "@/pages/AdminPage";
@@ -11,7 +12,8 @@ function App() {
       <Toaster position="top-center" richColors />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<ClassPickerPage />} />
+          <Route path="/classe/:classId" element={<HomePage />} />
           <Route path="/enfant/:id" element={<ChildWorkshopsPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>

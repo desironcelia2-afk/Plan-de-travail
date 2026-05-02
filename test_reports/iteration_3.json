@@ -1,0 +1,46 @@
+{
+  "summary": "Tested multi-class feature end-to-end (backend + frontend). Backend: 10/10 new multi-class tests PASS (classes CRUD, admin auth, class_id filtering on children & overview, cascade delete, last-class guard, backfill). Old test_api.py also updated to include class_id; 8/10 pass (2 failures are pre-existing assertions on stale seed data - children/workshops seeds were customized by previous iterations, not a multi-class regression). Frontend: full happy-path PASSED - ClassPicker auto-redirect with 1 class, multi-class picker grid, HomePage shows class emoji + name with back-to-classes button, Admin Classes tab (add + delete + cascade), Admin Enfants class selector scopes listing + creation, Admin Suivi class selector scopes overview rows, workshops remain global (same columns in overview regardless of class). E2E: created 'TEST_PS_UI' class + 'TEST_Kid_UI' child, verified child appears ONLY on /classe/{ps_id} (home + overview) and NOT in the default class, then deleted class which cascaded the child. ChildWorkshopsPage back button returns to /classe/{child.class_id}.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/children", "issue": "Missing class_id returns 422 (pydantic) rather than a friendly 400 error. Review contract (invalid class_id returns 400 'Classe invalide' which is good, but missing field returns raw pydantic 422 schema)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "HomePage initial render", "issue": "On a fast click, home-title briefly shows fallback 'Mes ateliers' before klass state loads (race). Not user-facing critical but worth guarding with a loading state or waiting for klass before rendering title.", "affected_selectors": ["[data-testid=\"home-title\"]"]}
+    ],
+    "design_issues": [
+      {"screen": "Class selector <select>", "issues": ["Uses native browser <select> instead of shadcn Select component. Consider upgrading for consistent styling (matches remaining UI which already uses shadcn)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_classes.py",
+    "/app/backend/tests/test_api.py",
+    "/app/test_reports/pytest/multiclass_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add loading skeleton to HomePage header instead of fallback text to avoid transient 'Mes ateliers' flash before klass loads.",
+    "(Optional) Return a user-friendly 400 when class_id is missing from POST /api/children (currently FastAPI returns 422 due to pydantic).",
+    "(Optional cleanup) Replace native <select> with shadcn Select for visual consistency with the rest of the admin UI."
+  ],
+  "critical_code_review_comments": [
+    "AdminPage.jsx is 612 lines - consider splitting Classes/Children/Workshops/Overview tabs into separate files for maintainability.",
+    "HomePage.jsx: the Promise.all().catch(() => {}) swallows errors silently; no error toast if a class fetch fails (user sees blank/fallback UI).",
+    "server.py on_startup: backfilling children with the FIRST class by created_at is reasonable, but if operators rename 'Classe par défaut' the label no longer reflects reality. Not a bug, just a note.",
+    "Cascade delete on /classes/{id} correctly removes children and their validations - verified.",
+    "Workshops are intentionally global (no class_id) as per product spec - implementation matches."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_classes.py (new - multi-class backend tests)",
+    "/app/backend/tests/test_api.py (updated test_create_child_unauthorized and test_child_full_crud_and_validation_flow to pass class_id, required after schema change)"
+  ],
+  "success_rate": {"backend": "100% (10/10 multi-class tests; 2 legacy seed-name tests unrelated)", "frontend": "100% (all critical multi-class flows)"},
+  "test_credentials": "Admin password: 'maitresse' (header X-Admin-Password). Sourced from /app/memory/test_credentials.md.",
+  "seed_data_creation": "Tests create TEST_PS_UI class + TEST_Kid_UI child then delete (cascade). State restored to 1 class 'Classe par défaut'. No lingering TEST_ data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Env has 1 class ('Classe par défaut') + ~21 children (20 legacy + original seeds) + 2 workshops ('Scissor Practice', 'Easter Memory'). Default class_id changes per env. Use GET /api/classes to fetch it dynamically. The cannot-delete-last-class guard is covered but only actually exercised when count==1 (test skips destructive path otherwise). When only 1 class exists, '/' auto-redirects to /classe/{id}, so testing the picker requires adding a 2nd class first.",
+  "rca of the issue": "No critical bugs found. Minor UX polish items only (see action_items)."
+}

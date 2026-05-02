@@ -41,7 +41,14 @@ def test_admin_login_wrong():
 
 
 def test_create_child_unauthorized():
-    r = requests.post(f"{API}/children", json={"name": "TEST_NoAuth"})
+    # Must supply a valid class_id so pydantic validation passes;
+    # then header check returns 401.
+    classes = requests.get(f"{API}/classes").json()
+    assert classes, "Need at least one class"
+    r = requests.post(
+        f"{API}/children",
+        json={"name": "TEST_NoAuth", "class_id": classes[0]["id"]},
+    )
     assert r.status_code == 401
 
 
@@ -51,8 +58,13 @@ def test_admin_overview_unauthorized():
 
 
 def test_child_full_crud_and_validation_flow():
+    # Fetch default class_id
+    classes = requests.get(f"{API}/classes").json()
+    assert classes
+    class_id = classes[0]["id"]
+
     # CREATE child
-    r = requests.post(f"{API}/children", json={"name": "TEST_Zoe", "emoji": "🦊", "color": "#FDE68A"}, headers=H)
+    r = requests.post(f"{API}/children", json={"name": "TEST_Zoe", "emoji": "🦊", "color": "#FDE68A", "class_id": class_id}, headers=H)
     assert r.status_code == 200
     child = r.json()
     cid = child["id"]

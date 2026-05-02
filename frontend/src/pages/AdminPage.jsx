@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, adminHeaders, setAdminPassword, getAdminPassword, clearAdminPassword } from "@/lib/api";
+import { api, adminHeaders, setAdminPassword, getAdminPassword, clearAdminPassword, photoSrc } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Trash2, Plus, LogOut, Check, X } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, LogOut, Check, X, Camera, ImageOff, School } from "lucide-react";
 import { toast } from "sonner";
 
 const CHILD_EMOJIS = ["🦊", "🐻", "🐰", "🦁", "🦄", "🐼", "🐨", "🐸", "🐵", "🦉", "🐯", "🐶", "🐱", "🐹", "🐻‍❄️"];
 const CHILD_COLORS = ["#FDE68A", "#BFDBFE", "#FBCFE8", "#FED7AA", "#DDD6FE", "#BBF7D0", "#FECACA", "#A7F3D0"];
 const WS_EMOJIS = ["🎨", "🧩", "🧶", "🔤", "🔢", "✂️", "📚", "🧱", "🎵", "🖍️", "🪁", "🧸", "🔍", "🧮"];
 const WS_COLORS = ["#FCA5A5", "#93C5FD", "#FDBA74", "#86EFAC", "#C4B5FD", "#F9A8D4", "#FCD34D", "#67E8F9"];
+const CLASS_EMOJIS = ["🏫", "🌈", "🌟", "🦋", "🐝", "🌻", "🍎", "🚂", "🎈", "🐙"];
+const CLASS_COLORS = ["#DBEAFE", "#FEF3C7", "#D1FAE5", "#FCE7F3", "#E9D5FF", "#FED7AA"];
 
 export default function AdminPage() {
   const navigate = useNavigate();
   const [authed, setAuthed] = useState(!!getAdminPassword());
   const [password, setPassword] = useState("");
+  const [classes, setClasses] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [children, setChildren] = useState([]);
   const [workshops, setWorkshops] = useState([]);
   const [overview, setOverview] = useState(null);
@@ -23,6 +27,7 @@ export default function AdminPage() {
   // forms
   const [newChild, setNewChild] = useState({ name: "", emoji: CHILD_EMOJIS[0], color: CHILD_COLORS[0] });
   const [newWs, setNewWs] = useState({ name: "", emoji: WS_EMOJIS[0], color: WS_COLORS[0] });
+  const [newClass, setNewClass] = useState({ name: "", emoji: CLASS_EMOJIS[0], color: CLASS_COLORS[0] });
 
   const login = async (e) => {
     e.preventDefault();
@@ -44,10 +49,19 @@ export default function AdminPage() {
 
   const loadAll = async () => {
     try {
+      const cls = await api.get("/classes");
+      setClasses(cls.data);
+      const firstClassId = selectedClassId || cls.data[0]?.id || "";
+      if (!selectedClassId && firstClassId) setSelectedClassId(firstClassId);
+      const effectiveClassId = selectedClassId || firstClassId;
+
       const [c, w, o] = await Promise.all([
-        api.get("/children"),
+        api.get("/children", effectiveClassId ? { params: { class_id: effectiveClassId } } : {}),
         api.get("/workshops"),
-        api.get("/admin/overview", adminHeaders()),
+        api.get("/admin/overview", {
+          ...adminHeaders(),
+          params: effectiveClassId ? { class_id: effectiveClassId } : {},
+        }),
       ]);
       setChildren(c.data);
       setWorkshops(w.data);
@@ -63,13 +77,40 @@ export default function AdminPage() {
   useEffect(() => {
     if (authed) loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [authed, selectedClassId]);
+
+  const addClass = async (e) => {
+    e.preventDefault();
+    if (!newClass.name.trim()) return toast.error("Nom de classe requis");
+    try {
+      const res = await api.post("/classes", newClass, adminHeaders());
+      setNewClass({ name: "", emoji: CLASS_EMOJIS[0], color: CLASS_COLORS[0] });
+      toast.success("Classe ajoutée");
+      setSelectedClassId(res.data.id);
+      loadAll();
+    } catch {
+      toast.error("Erreur à l'ajout");
+    }
+  };
+
+  const removeClass = async (kid) => {
+    if (!window.confirm("Supprimer cette classe (et tous ses enfants + validations) ?")) return;
+    try {
+      await api.delete(`/classes/${kid}`, adminHeaders());
+      toast.success("Classe supprimée");
+      if (selectedClassId === kid) setSelectedClassId("");
+      loadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Erreur");
+    }
+  };
 
   const addChild = async (e) => {
     e.preventDefault();
     if (!newChild.name.trim()) return toast.error("Prénom requis");
+    if (!selectedClassId) return toast.error("Sélectionne d'abord une classe");
     try {
-      await api.post("/children", newChild, adminHeaders());
+      await api.post("/children", { ...newChild, class_id: selectedClassId }, adminHeaders());
       setNewChild({ name: "", emoji: CHILD_EMOJIS[0], color: CHILD_COLORS[0] });
       toast.success("Enfant ajouté");
       loadAll();
@@ -103,6 +144,36 @@ export default function AdminPage() {
     await api.delete(`/workshops/${wid}`, adminHeaders());
     toast.success("Atelier supprimé");
     loadAll();
+  };
+
+  const uploadPhoto = async (entity, id, file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast.error("Choisis une image");
+    if (file.size > 5 * 1024 * 1024) return toast.error("Image trop lourde (max 5 Mo)");
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const path = entity === "child" ? `/children/${id}/photo` : `/workshops/${id}/photo`;
+      await api.post(path, fd, {
+        headers: { ...adminHeaders().headers, "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Photo mise à jour");
+      loadAll();
+    } catch {
+      toast.error("Erreur à l'upload");
+    }
+  };
+
+  const removePhoto = async (entity, id) => {
+    if (!window.confirm("Retirer la photo ?")) return;
+    try {
+      const path = entity === "child" ? `/children/${id}/photo` : `/workshops/${id}/photo`;
+      await api.delete(path, adminHeaders());
+      toast.success("Photo retirée");
+      loadAll();
+    } catch {
+      toast.error("Erreur");
+    }
   };
 
   if (!authed) {
@@ -153,15 +224,107 @@ export default function AdminPage() {
         </button>
       </header>
 
-      <Tabs defaultValue="children" className="w-full">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl mb-6 h-auto bg-white border-4 border-[#CBD5E1] rounded-2xl p-1">
+      <Tabs defaultValue="classes" className="w-full">
+        <TabsList className="grid grid-cols-4 w-full max-w-3xl mb-6 h-auto bg-white border-4 border-[#CBD5E1] rounded-2xl p-1">
+          <TabsTrigger value="classes" className="text-base md:text-lg py-3 rounded-xl" data-testid="tab-classes">Classes</TabsTrigger>
           <TabsTrigger value="children" className="text-base md:text-lg py-3 rounded-xl" data-testid="tab-children">Enfants</TabsTrigger>
           <TabsTrigger value="workshops" className="text-base md:text-lg py-3 rounded-xl" data-testid="tab-workshops">Ateliers</TabsTrigger>
           <TabsTrigger value="overview" className="text-base md:text-lg py-3 rounded-xl" data-testid="tab-overview">Suivi</TabsTrigger>
         </TabsList>
 
+        {/* Classes Tab */}
+        <TabsContent value="classes">
+          <form onSubmit={addClass} className="kb-card p-6 mb-6 space-y-4" data-testid="add-class-form">
+            <h2 className="font-heading font-bold text-2xl">Ajouter une classe</h2>
+            <div>
+              <Label className="text-base">Nom de la classe</Label>
+              <Input
+                value={newClass.name}
+                onChange={(e) => setNewClass({ ...newClass, name: e.target.value })}
+                placeholder="Ex : Petite Section, Classe de Léa…"
+                className="h-12 text-lg rounded-xl border-2"
+                data-testid="new-class-name"
+              />
+            </div>
+            <div>
+              <Label className="text-base">Icône</Label>
+              <div className="flex gap-2 flex-wrap mt-1">
+                {CLASS_EMOJIS.map((e) => (
+                  <button
+                    type="button"
+                    key={e}
+                    onClick={() => setNewClass({ ...newClass, emoji: e })}
+                    className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
+                      newClass.emoji === e ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
+                    }`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-base">Couleur</Label>
+              <div className="flex gap-2 flex-wrap mt-1">
+                {CLASS_COLORS.map((c) => (
+                  <button
+                    type="button"
+                    key={c}
+                    onClick={() => setNewClass({ ...newClass, color: c })}
+                    className={`w-10 h-10 rounded-full border-4 ${newClass.color === c ? "border-[#0F172A]" : "border-white"}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={c}
+                  />
+                ))}
+              </div>
+            </div>
+            <button type="submit" className="kb-btn kb-btn-primary" data-testid="add-class-btn">
+              <Plus className="w-5 h-5" /> Ajouter la classe
+            </button>
+          </form>
+
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="classes-admin-list">
+            {classes.map((k) => (
+              <div key={k.id} className="kb-card p-5 flex items-center justify-between gap-3" style={{ backgroundColor: k.color }}>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-16 h-16 rounded-2xl bg-white border-4 border-white flex items-center justify-center text-3xl flex-shrink-0">
+                    {k.emoji}
+                  </div>
+                  <div className="font-heading font-bold text-xl truncate">{k.name}</div>
+                </div>
+                <button
+                  onClick={() => removeClass(k.id)}
+                  className="kb-btn kb-btn-danger"
+                  data-testid={`delete-class-${k.name}`}
+                  disabled={classes.length <= 1}
+                  title={classes.length <= 1 ? "Impossible de supprimer la dernière classe" : "Supprimer"}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
         {/* Children Tab */}
         <TabsContent value="children">
+          <div className="kb-card p-4 md:p-5 mb-6 flex items-center gap-3 flex-wrap" data-testid="class-selector-bar">
+            <School className="w-6 h-6 text-[#475569] flex-shrink-0" />
+            <Label className="text-lg font-heading mb-0">Classe :</Label>
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="h-12 text-lg rounded-xl border-2 border-[#CBD5E1] px-4 bg-white font-bold flex-1 min-w-[200px]"
+              data-testid="class-select"
+            >
+              {classes.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.emoji} {k.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <form onSubmit={addChild} className="kb-card p-6 mb-6 space-y-4" data-testid="add-child-form">
             <h2 className="font-heading font-bold text-2xl">Ajouter un enfant</h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -215,20 +378,52 @@ export default function AdminPage() {
 
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="children-admin-list">
             {children.map((c) => (
-              <div key={c.id} className="kb-card p-5 flex items-center justify-between" style={{ backgroundColor: c.color }}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-14 h-14 rounded-full bg-white border-4 border-white flex items-center justify-center text-3xl">
-                    {c.emoji}
+              <div key={c.id} className="kb-card p-5 flex items-center justify-between gap-3" style={{ backgroundColor: c.color }}>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-16 h-16 rounded-full bg-white border-4 border-white flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
+                    {c.photo_url ? (
+                      <img src={photoSrc(c.photo_url)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      c.emoji
+                    )}
                   </div>
                   <div className="font-heading font-bold text-xl truncate">{c.name}</div>
                 </div>
-                <button
-                  onClick={() => removeChild(c.id)}
-                  className="kb-btn kb-btn-danger"
-                  data-testid={`delete-child-${c.name}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <label
+                    className="kb-btn kb-btn-ghost cursor-pointer"
+                    data-testid={`upload-child-photo-${c.name}`}
+                    title={c.photo_url ? "Remplacer la photo" : "Ajouter une photo"}
+                  >
+                    <Camera className="w-4 h-4" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        uploadPhoto("child", c.id, e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {c.photo_url && (
+                    <button
+                      onClick={() => removePhoto("child", c.id)}
+                      className="kb-btn kb-btn-ghost"
+                      title="Retirer la photo"
+                      data-testid={`remove-child-photo-${c.name}`}
+                    >
+                      <ImageOff className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => removeChild(c.id)}
+                    className="kb-btn kb-btn-danger"
+                    data-testid={`delete-child-${c.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -287,20 +482,52 @@ export default function AdminPage() {
 
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="workshops-admin-list">
             {workshops.map((w) => (
-              <div key={w.id} className="kb-card p-5 flex items-center justify-between" style={{ backgroundColor: w.color }}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-14 h-14 rounded-2xl bg-white border-4 border-white flex items-center justify-center text-3xl">
-                    {w.emoji}
+              <div key={w.id} className="kb-card p-5 flex items-center justify-between gap-3" style={{ backgroundColor: w.color }}>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-16 h-16 rounded-2xl bg-white border-4 border-white flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
+                    {w.photo_url ? (
+                      <img src={photoSrc(w.photo_url)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      w.emoji
+                    )}
                   </div>
                   <div className="font-heading font-bold text-xl truncate">{w.name}</div>
                 </div>
-                <button
-                  onClick={() => removeWs(w.id)}
-                  className="kb-btn kb-btn-danger"
-                  data-testid={`delete-workshop-${w.name}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <label
+                    className="kb-btn kb-btn-ghost cursor-pointer"
+                    data-testid={`upload-workshop-photo-${w.name}`}
+                    title={w.photo_url ? "Remplacer la photo" : "Ajouter une photo"}
+                  >
+                    <Camera className="w-4 h-4" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        uploadPhoto("workshop", w.id, e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {w.photo_url && (
+                    <button
+                      onClick={() => removePhoto("workshop", w.id)}
+                      className="kb-btn kb-btn-ghost"
+                      title="Retirer la photo"
+                      data-testid={`remove-workshop-photo-${w.name}`}
+                    >
+                      <ImageOff className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => removeWs(w.id)}
+                    className="kb-btn kb-btn-danger"
+                    data-testid={`delete-workshop-${w.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -308,6 +535,22 @@ export default function AdminPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview">
+          <div className="kb-card p-4 md:p-5 mb-6 flex items-center gap-3 flex-wrap">
+            <School className="w-6 h-6 text-[#475569] flex-shrink-0" />
+            <Label className="text-lg font-heading mb-0">Classe :</Label>
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="h-12 text-lg rounded-xl border-2 border-[#CBD5E1] px-4 bg-white font-bold flex-1 min-w-[200px]"
+              data-testid="overview-class-select"
+            >
+              {classes.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.emoji} {k.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="kb-card p-4 md:p-6 overflow-x-auto" data-testid="overview-table">
             {!overview || overview.rows.length === 0 ? (
               <p className="text-lg text-[#475569]">Aucune donnée.</p>
@@ -330,7 +573,13 @@ export default function AdminPage() {
                     <tr key={row.child.id} className="border-t-2 border-[#E2E8F0]">
                       <td className="p-3 sticky left-0 bg-white">
                         <div className="flex items-center gap-2">
-                          <span className="text-2xl">{row.child.emoji}</span>
+                          <div className="w-10 h-10 rounded-full bg-white border-2 border-[#E2E8F0] flex items-center justify-center text-2xl overflow-hidden flex-shrink-0" style={{ backgroundColor: row.child.color }}>
+                            {row.child.photo_url ? (
+                              <img src={photoSrc(row.child.photo_url)} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{row.child.emoji}</span>
+                            )}
+                          </div>
                           <span className="font-bold">{row.child.name}</span>
                         </div>
                       </td>

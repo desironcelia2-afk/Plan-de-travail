@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, photoSrc } from "@/lib/api";
 import { ArrowLeft, Check, Home as HomeIcon } from "lucide-react";
 import Confetti from "react-confetti";
 import { toast } from "sonner";
@@ -83,7 +83,7 @@ export default function ChildWorkshopsPage() {
 
       <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(child?.class_id ? `/classe/${child.class_id}` : "/")}
           className="kb-btn kb-btn-back"
           data-testid="back-home-btn"
         >
@@ -94,11 +94,15 @@ export default function ChildWorkshopsPage() {
 
         <div className="flex items-center gap-4">
           <div
-            className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-white shadow-lg flex items-center justify-center text-4xl md:text-5xl"
+            className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-white shadow-lg flex items-center justify-center text-4xl md:text-5xl overflow-hidden"
             style={{ backgroundColor: child.color }}
             aria-hidden
           >
-            {child.emoji}
+            {child.photo_url ? (
+              <img src={photoSrc(child.photo_url)} alt="" className="w-full h-full object-cover" />
+            ) : (
+              child.emoji
+            )}
           </div>
           <div>
             <div className="font-heading font-bold text-3xl md:text-5xl text-[#0F172A]" data-testid="child-name">
@@ -135,11 +139,19 @@ export default function ChildWorkshopsPage() {
             >
               <div className="flex items-center gap-5 flex-1 min-w-0">
                 <div
-                  className="w-20 h-20 md:w-24 md:h-24 rounded-3xl border-4 border-white shadow-md flex items-center justify-center text-5xl md:text-6xl flex-shrink-0"
+                  className="w-20 h-20 md:w-24 md:h-24 rounded-3xl border-4 border-white shadow-md flex items-center justify-center text-5xl md:text-6xl flex-shrink-0 overflow-hidden"
                   style={{ backgroundColor: s.workshop.color }}
                   aria-hidden
                 >
-                  {s.workshop.emoji}
+                  {s.workshop.photo_url ? (
+                    <img
+                      src={photoSrc(s.workshop.photo_url)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    s.workshop.emoji
+                  )}
                 </div>
                 <div className="min-w-0">
                   <div className="font-heading font-bold text-2xl md:text-4xl truncate">
