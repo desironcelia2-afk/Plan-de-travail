@@ -351,7 +351,10 @@ async def child_status(child_id: str):
         raise HTTPException(status_code=404, detail="Enfant introuvable")
 
     workshops = await db.workshops.find({}, {"_id": 0}).sort("created_at", 1).to_list(1000)
-    validations = await db.validations.find({"child_id": child_id}, {"_id": 0}).to_list(10000)
+    validations = await db.validations.find(
+        {"child_id": child_id},
+        {"_id": 0, "workshop_id": 1, "timestamp": 1},
+    ).to_list(2000)
 
     latest = {}
     for v in validations:
@@ -403,7 +406,12 @@ async def admin_overview(class_id: Optional[str] = None, x_admin_password: Optio
     child_query = {"class_id": class_id} if class_id else {}
     children = await db.children.find(child_query, {"_id": 0}).sort("name", 1).to_list(1000)
     workshops = await db.workshops.find({}, {"_id": 0}).sort("created_at", 1).to_list(1000)
-    validations = await db.validations.find({}, {"_id": 0}).to_list(100000)
+    child_ids = [c["id"] for c in children]
+    validation_query = {"child_id": {"$in": child_ids}} if child_ids else {"child_id": {"$in": []}}
+    validations = await db.validations.find(
+        validation_query,
+        {"_id": 0, "child_id": 1, "workshop_id": 1},
+    ).to_list(20000)
 
     done_map = {}  # child_id -> set of workshop_ids
     for v in validations:
