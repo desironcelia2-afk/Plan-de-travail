@@ -131,9 +131,9 @@ export default function ChildWorkshopsPage() {
               className="kb-card p-5 md:p-7 flex items-center justify-between gap-4 text-left animate-fade-up"
               style={{
                 animationDelay: `${idx * 50}ms`,
-                backgroundColor: s.done ? "#DCFCE7" : "#FFFFFF",
-                borderColor: s.done ? "#86EFAC" : "var(--border)",
-                boxShadow: s.done ? "0 8px 0 #86EFAC" : "0 8px 0 var(--border)",
+                backgroundColor: s.workshop.color,
+                borderColor: s.done ? "#16A34A" : "var(--border)",
+                boxShadow: s.done ? "0 8px 0 #16A34A" : "0 8px 0 var(--border)",
               }}
               data-testid={`workshop-row-${s.workshop.id}`}
             >
