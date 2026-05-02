@@ -121,6 +121,18 @@ class WorkshopCreate(BaseModel):
     color: Optional[str] = "#BFDBFE"
 
 
+class WorkshopUpdate(BaseModel):
+    name: Optional[str] = None
+    emoji: Optional[str] = None
+    color: Optional[str] = None
+
+
+class ClassRoomUpdate(BaseModel):
+    name: Optional[str] = None
+    emoji: Optional[str] = None
+    color: Optional[str] = None
+
+
 class ValidationRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     child_id: str
@@ -177,6 +189,19 @@ async def create_class(payload: ClassRoomCreate, x_admin_password: Optional[str]
     return klass
 
 
+@api_router.patch("/classes/{class_id}", response_model=ClassRoom)
+async def update_class(class_id: str, payload: ClassRoomUpdate, x_admin_password: Optional[str] = Header(None)):
+    verify_admin(x_admin_password)
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="Aucune modification")
+    result = await db.classes.update_one({"id": class_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Classe introuvable")
+    doc = await db.classes.find_one({"id": class_id}, {"_id": 0})
+    return doc
+
+
 @api_router.delete("/classes/{class_id}")
 async def delete_class(class_id: str, x_admin_password: Optional[str] = Header(None)):
     verify_admin(x_admin_password)
@@ -224,6 +249,23 @@ async def create_child(payload: ChildCreate, x_admin_password: Optional[str] = H
     return child
 
 
+@api_router.patch("/children/{child_id}", response_model=Child)
+async def update_child(child_id: str, payload: ChildUpdate, x_admin_password: Optional[str] = Header(None)):
+    verify_admin(x_admin_password)
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="Aucune modification")
+    if "class_id" in updates:
+        klass = await db.classes.find_one({"id": updates["class_id"]}, {"_id": 0})
+        if not klass:
+            raise HTTPException(status_code=400, detail="Classe invalide")
+    result = await db.children.update_one({"id": child_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Enfant introuvable")
+    doc = await db.children.find_one({"id": child_id}, {"_id": 0})
+    return doc
+
+
 @api_router.delete("/children")
 async def delete_all_children(class_id: Optional[str] = None, x_admin_password: Optional[str] = Header(None)):
     verify_admin(x_admin_password)
@@ -266,6 +308,19 @@ async def create_workshop(payload: WorkshopCreate, x_admin_password: Optional[st
     workshop = Workshop(**payload.model_dump())
     await db.workshops.insert_one(workshop.model_dump())
     return workshop
+
+
+@api_router.patch("/workshops/{workshop_id}", response_model=Workshop)
+async def update_workshop(workshop_id: str, payload: WorkshopUpdate, x_admin_password: Optional[str] = Header(None)):
+    verify_admin(x_admin_password)
+    updates = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="Aucune modification")
+    result = await db.workshops.update_one({"id": workshop_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Atelier introuvable")
+    doc = await db.workshops.find_one({"id": workshop_id}, {"_id": 0})
+    return doc
 
 
 @api_router.delete("/workshops")

@@ -4,7 +4,8 @@ import { api, adminHeaders, setAdminPassword, getAdminPassword, clearAdminPasswo
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Trash2, Plus, LogOut, Check, X, Camera, ImageOff, School } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Trash2, Plus, LogOut, Check, X, Camera, ImageOff, School, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 const CHILD_EMOJIS = ["🦊", "🐻", "🐰", "🦁", "🦄", "🐼", "🐨", "🐸", "🐵", "🦉", "🐯", "🐶", "🐱", "🐹", "🐻‍❄️"];
@@ -28,6 +29,40 @@ export default function AdminPage() {
   const [newChild, setNewChild] = useState({ name: "", emoji: CHILD_EMOJIS[0], color: CHILD_COLORS[0] });
   const [newWs, setNewWs] = useState({ name: "", emoji: WS_EMOJIS[0], color: WS_COLORS[0] });
   const [newClass, setNewClass] = useState({ name: "", emoji: CLASS_EMOJIS[0], color: CLASS_COLORS[0] });
+
+  // edit dialog state: { kind: 'child'|'workshop'|'class', id, name, emoji, color, class_id? }
+  const [editing, setEditing] = useState(null);
+
+  const openEdit = (kind, item) => {
+    setEditing({ kind, id: item.id, name: item.name, emoji: item.emoji, color: item.color, class_id: item.class_id });
+  };
+  const closeEdit = () => setEditing(null);
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    if (!editing.name.trim()) return toast.error("Nom requis");
+    const body = { name: editing.name, emoji: editing.emoji, color: editing.color };
+    if (editing.kind === "child") body.class_id = editing.class_id;
+    const path =
+      editing.kind === "child" ? `/children/${editing.id}` :
+      editing.kind === "workshop" ? `/workshops/${editing.id}` :
+      `/classes/${editing.id}`;
+    try {
+      await api.patch(path, body, adminHeaders());
+      toast.success("Modifié");
+      closeEdit();
+      loadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Erreur");
+    }
+  };
+
+  const editPalettes = {
+    child: { emojis: CHILD_EMOJIS, colors: CHILD_COLORS },
+    workshop: { emojis: WS_EMOJIS, colors: WS_COLORS },
+    class: { emojis: CLASS_EMOJIS, colors: CLASS_COLORS },
+  };
+  const editLabels = { child: "l'enfant", workshop: "l'atelier", class: "la classe" };
 
   const login = async (e) => {
     e.preventDefault();
@@ -321,15 +356,25 @@ export default function AdminPage() {
                   </div>
                   <div className="font-heading font-bold text-xl truncate">{k.name}</div>
                 </div>
-                <button
-                  onClick={() => removeClass(k.id)}
-                  className="kb-btn kb-btn-danger"
-                  data-testid={`delete-class-${k.name}`}
-                  disabled={classes.length <= 1}
-                  title={classes.length <= 1 ? "Impossible de supprimer la dernière classe" : "Supprimer"}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => openEdit("class", k)}
+                    className="kb-btn kb-btn-ghost"
+                    data-testid={`edit-class-${k.name}`}
+                    title="Modifier"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => removeClass(k.id)}
+                    className="kb-btn kb-btn-danger"
+                    data-testid={`delete-class-${k.name}`}
+                    disabled={classes.length <= 1}
+                    title={classes.length <= 1 ? "Impossible de supprimer la dernière classe" : "Supprimer"}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -459,6 +504,14 @@ export default function AdminPage() {
                     </button>
                   )}
                   <button
+                    onClick={() => openEdit("child", c)}
+                    className="kb-btn kb-btn-ghost"
+                    data-testid={`edit-child-${c.name}`}
+                    title="Modifier"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => removeChild(c.id)}
                     className="kb-btn kb-btn-danger"
                     data-testid={`delete-child-${c.name}`}
@@ -576,6 +629,14 @@ export default function AdminPage() {
                     </button>
                   )}
                   <button
+                    onClick={() => openEdit("workshop", w)}
+                    className="kb-btn kb-btn-ghost"
+                    data-testid={`edit-workshop-${w.name}`}
+                    title="Modifier"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => removeWs(w.id)}
                     className="kb-btn kb-btn-danger"
                     data-testid={`delete-workshop-${w.name}`}
@@ -667,6 +728,91 @@ export default function AdminPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && closeEdit()}>
+        <DialogContent className="max-w-lg rounded-3xl border-4 border-[#CBD5E1]" data-testid="edit-dialog">
+          {editing && (
+            <form onSubmit={saveEdit} className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-2xl">
+                  Modifier {editLabels[editing.kind]}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div>
+                <Label className="text-base">Nom</Label>
+                <Input
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  className="h-12 text-lg rounded-xl border-2"
+                  data-testid="edit-name-input"
+                  autoFocus
+                />
+              </div>
+
+              {editing.kind === "child" && (
+                <div>
+                  <Label className="text-base">Classe</Label>
+                  <select
+                    value={editing.class_id || ""}
+                    onChange={(e) => setEditing({ ...editing, class_id: e.target.value })}
+                    className="w-full h-12 text-lg rounded-xl border-2 border-[#CBD5E1] px-4 bg-white font-bold"
+                    data-testid="edit-class-select"
+                  >
+                    {classes.map((k) => (
+                      <option key={k.id} value={k.id}>{k.emoji} {k.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-base">Emoji</Label>
+                <div className="flex gap-2 flex-wrap mt-1 max-h-32 overflow-y-auto">
+                  {editPalettes[editing.kind].emojis.map((em) => (
+                    <button
+                      type="button"
+                      key={em}
+                      onClick={() => setEditing({ ...editing, emoji: em })}
+                      className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
+                        editing.emoji === em ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
+                      }`}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-base">Couleur</Label>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {editPalettes[editing.kind].colors.map((col) => (
+                    <button
+                      type="button"
+                      key={col}
+                      onClick={() => setEditing({ ...editing, color: col })}
+                      className={`w-10 h-10 rounded-full border-4 ${editing.color === col ? "border-[#0F172A]" : "border-white"}`}
+                      style={{ backgroundColor: col }}
+                      aria-label={col}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-2">
+                <button type="button" onClick={closeEdit} className="kb-btn kb-btn-ghost" data-testid="edit-cancel-btn">
+                  Annuler
+                </button>
+                <button type="submit" className="kb-btn kb-btn-primary" data-testid="edit-save-btn">
+                  Enregistrer
+                </button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
