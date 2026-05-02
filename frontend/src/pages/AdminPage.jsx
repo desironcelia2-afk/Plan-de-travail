@@ -10,7 +10,7 @@ import { toast } from "sonner";
 const CHILD_EMOJIS = ["🦊", "🐻", "🐰", "🦁", "🦄", "🐼", "🐨", "🐸", "🐵", "🦉", "🐯", "🐶", "🐱", "🐹", "🐻‍❄️"];
 const CHILD_COLORS = ["#FDE68A", "#BFDBFE", "#FBCFE8", "#FED7AA", "#DDD6FE", "#BBF7D0", "#FECACA", "#A7F3D0"];
 const WS_EMOJIS = ["🎨", "🧩", "🧶", "🔤", "🔢", "✂️", "📚", "🧱", "🎵", "🖍️", "🪁", "🧸", "🔍", "🧮"];
-const WS_COLORS = ["#FCA5A5", "#93C5FD", "#FDBA74", "#86EFAC", "#C4B5FD", "#F9A8D4", "#FCD34D", "#67E8F9"];
+const WS_COLORS = ["#EF4444", "#3B82F6", "#FACC15", "#22C55E", "#FCA5A5", "#93C5FD", "#FDBA74", "#86EFAC", "#C4B5FD", "#F9A8D4", "#FCD34D", "#67E8F9"];
 const CLASS_EMOJIS = ["🏫", "🌈", "🌟", "🦋", "🐝", "🌻", "🍎", "🚂", "🎈", "🐙"];
 const CLASS_COLORS = ["#DBEAFE", "#FEF3C7", "#D1FAE5", "#FCE7F3", "#E9D5FF", "#FED7AA"];
 
