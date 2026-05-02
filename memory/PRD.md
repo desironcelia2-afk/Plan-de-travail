@@ -28,7 +28,25 @@
 - ✅ Login admin avec mot de passe (`maitresse` par défaut, configurable via `ADMIN_PASSWORD`).
 - ✅ sessionStorage pour rester connecté sur rafraîchissement.
 - ✅ Design neo-brutalist playful (Fredoka, Nunito, cartes chunky, couleurs pastel).
-- ✅ 100 % des tests backend et frontend passent (iteration_1).
+
+## Implemented (v2 — Photos — Feb 2026)
+- ✅ Upload photos pour enfants et ateliers via Emergent object storage.
+- ✅ Photo remplace l'emoji quand présente sur home / page enfant / admin.
+- ✅ Bouton Camera (upload) + ImageOff (retirer) dans l'admin.
+- ✅ Validation format (jpg/png/webp/gif) + taille max 5 Mo.
+- ✅ Backend tests : 9/9 pass (upload, download, delete, unauth, oversize, bad format).
+
+## Implemented (v3 — Multi-classes — Feb 2026)
+- ✅ Nouvelle entité `Class` (classes collection) avec nom / emoji / couleur.
+- ✅ Chaque enfant rattaché à une classe (`class_id`).
+- ✅ Les ateliers restent partagés entre toutes les classes (choix utilisateur).
+- ✅ Migration auto : création de "Classe par défaut" au démarrage si aucune classe, et backfill des enfants sans class_id.
+- ✅ Nouvelle route `/` = ClassPickerPage ; auto-redirige si une seule classe.
+- ✅ `/classe/:classId` = grille des prénoms de cette classe.
+- ✅ Bouton retour « Classes » dans HomePage, retour vers `/classe/:classId` depuis page enfant.
+- ✅ Admin : nouvel onglet « Classes » avec ajout/suppression (protection dernière classe) + sélecteur de classe dans Enfants / Suivi.
+- ✅ Cascade delete : supprimer une classe supprime ses enfants et leurs validations.
+- ✅ Tests backend multi-classes : 10/10 pass. Tests frontend E2E : 100% pass.
 
 ## Backlog / Next tasks
 - **P1** — Photos d'enfants (upload avatar au lieu d'emoji) via object storage.
