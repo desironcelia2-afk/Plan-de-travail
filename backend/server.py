@@ -224,6 +224,17 @@ async def create_child(payload: ChildCreate, x_admin_password: Optional[str] = H
     return child
 
 
+@api_router.delete("/children")
+async def delete_all_children(class_id: Optional[str] = None, x_admin_password: Optional[str] = Header(None)):
+    verify_admin(x_admin_password)
+    query = {"class_id": class_id} if class_id else {}
+    children_ids = [c["id"] async for c in db.children.find(query, {"_id": 0, "id": 1})]
+    if children_ids:
+        await db.validations.delete_many({"child_id": {"$in": children_ids}})
+    result = await db.children.delete_many(query)
+    return {"success": True, "deleted": result.deleted_count}
+
+
 @api_router.delete("/children/{child_id}")
 async def delete_child(child_id: str, x_admin_password: Optional[str] = Header(None)):
     verify_admin(x_admin_password)
@@ -255,6 +266,16 @@ async def create_workshop(payload: WorkshopCreate, x_admin_password: Optional[st
     workshop = Workshop(**payload.model_dump())
     await db.workshops.insert_one(workshop.model_dump())
     return workshop
+
+
+@api_router.delete("/workshops")
+async def delete_all_workshops(x_admin_password: Optional[str] = Header(None)):
+    verify_admin(x_admin_password)
+    workshop_ids = [w["id"] async for w in db.workshops.find({}, {"_id": 0, "id": 1})]
+    if workshop_ids:
+        await db.validations.delete_many({"workshop_id": {"$in": workshop_ids}})
+    result = await db.workshops.delete_many({})
+    return {"success": True, "deleted": result.deleted_count}
 
 
 @api_router.delete("/workshops/{workshop_id}")

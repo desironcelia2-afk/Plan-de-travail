@@ -146,6 +146,35 @@ export default function AdminPage() {
     loadAll();
   };
 
+  const removeAllChildren = async () => {
+    const klass = classes.find((k) => k.id === selectedClassId);
+    const label = klass ? `de la classe « ${klass.name} »` : "";
+    if (!window.confirm(`⚠️ Effacer TOUS les enfants ${label} ainsi que toutes leurs validations ?\n\nCette action est définitive.`)) return;
+    if (!window.confirm("Es-tu vraiment sûr·e ? Confirme une dernière fois.")) return;
+    try {
+      const res = await api.delete("/children", {
+        ...adminHeaders(),
+        params: selectedClassId ? { class_id: selectedClassId } : {},
+      });
+      toast.success(`${res.data.deleted} enfant(s) supprimé(s)`);
+      loadAll();
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const removeAllWorkshops = async () => {
+    if (!window.confirm("⚠️ Effacer TOUS les ateliers ainsi que toutes les validations associées ?\n\nCette action est définitive et concerne TOUTES les classes.")) return;
+    if (!window.confirm("Es-tu vraiment sûr·e ? Confirme une dernière fois.")) return;
+    try {
+      const res = await api.delete("/workshops", adminHeaders());
+      toast.success(`${res.data.deleted} atelier(s) supprimé(s)`);
+      loadAll();
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
   const uploadPhoto = async (entity, id, file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("Choisis une image");
@@ -376,6 +405,19 @@ export default function AdminPage() {
             </button>
           </form>
 
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <h3 className="font-heading font-bold text-xl">Enfants ({children.length})</h3>
+            {children.length > 0 && (
+              <button
+                onClick={removeAllChildren}
+                className="kb-btn kb-btn-danger"
+                data-testid="delete-all-children-btn"
+                title="Effacer tous les enfants de cette classe"
+              >
+                <Trash2 className="w-4 h-4" /> Tout effacer
+              </button>
+            )}
+          </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="children-admin-list">
             {children.map((c) => (
               <div key={c.id} className="kb-card p-5 flex items-center justify-between gap-3" style={{ backgroundColor: c.color }}>
@@ -480,6 +522,19 @@ export default function AdminPage() {
             </button>
           </form>
 
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <h3 className="font-heading font-bold text-xl">Ateliers ({workshops.length})</h3>
+            {workshops.length > 0 && (
+              <button
+                onClick={removeAllWorkshops}
+                className="kb-btn kb-btn-danger"
+                data-testid="delete-all-workshops-btn"
+                title="Effacer tous les ateliers (toutes classes)"
+              >
+                <Trash2 className="w-4 h-4" /> Tout effacer
+              </button>
+            )}
+          </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="workshops-admin-list">
             {workshops.map((w) => (
               <div key={w.id} className="kb-card p-5 flex items-center justify-between gap-3" style={{ backgroundColor: w.color }}>
