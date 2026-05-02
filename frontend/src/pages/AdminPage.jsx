@@ -561,8 +561,14 @@ export default function AdminPage() {
                     <th className="text-left font-heading text-lg p-3 sticky left-0 bg-white">Enfant</th>
                     {overview.workshops.map((w) => (
                       <th key={w.id} className="p-3 font-heading text-base text-center min-w-[90px]">
-                        <div className="text-2xl">{w.emoji}</div>
-                        <div className="text-sm text-[#475569]">{w.name}</div>
+                        <div className="w-10 h-10 mx-auto rounded-xl border-2 border-[#E2E8F0] flex items-center justify-center text-2xl overflow-hidden" style={{ backgroundColor: w.color }}>
+                          {w.photo_url ? (
+                            <img src={photoSrc(w.photo_url)} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span>{w.emoji}</span>
+                          )}
+                        </div>
+                        <div className="text-sm text-[#475569] mt-1">{w.name}</div>
                       </th>
                     ))}
                     <th className="p-3 font-heading text-base text-center">Total</th>
