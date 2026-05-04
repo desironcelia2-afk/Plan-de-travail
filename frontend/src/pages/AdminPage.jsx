@@ -17,13 +17,11 @@ const CLASS_COLORS = ["#DBEAFE", "#FEF3C7", "#D1FAE5", "#FCE7F3", "#E9D5FF", "#F
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const [authed, setAuthed] = useState(!!getAdminPassword());
-  const [password, setPassword] = useState("");
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [children, setChildren] = useState([]);
   const [workshops, setWorkshops] = useState([]);
-  const [overview, setOverview] = useState(null);
+  const [overviewByClass, setOverviewByClass] = useState({}); // { class_id: {workshops, rows} }
 
   // forms
   const [newChild, setNewChild] = useState({ name: "", emoji: CHILD_EMOJIS[0], color: CHILD_COLORS[0] });
@@ -64,23 +62,8 @@ export default function AdminPage() {
   };
   const editLabels = { child: "l'enfant", workshop: "l'atelier", class: "la classe" };
 
-  const login = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post("/admin/login", { password });
-      setAdminPassword(password);
-      setAuthed(true);
-      toast.success("Connexion réussie");
-    } catch {
-      toast.error("Mot de passe incorrect");
-    }
-  };
-
-  const logout = () => {
-    clearAdminPassword();
-    setAuthed(false);
-    setPassword("");
-  };
+  const login = () => {}; // auth disabled
+  const logout = () => {}; // auth disabled
 
   const loadAll = async () => {
     try {
@@ -90,29 +73,30 @@ export default function AdminPage() {
       if (!selectedClassId && firstClassId) setSelectedClassId(firstClassId);
       const effectiveClassId = selectedClassId || firstClassId;
 
-      const [c, w, o] = await Promise.all([
+      const [c, w, ...classOverviews] = await Promise.all([
         api.get("/children", effectiveClassId ? { params: { class_id: effectiveClassId } } : {}),
         api.get("/workshops"),
-        api.get("/admin/overview", {
-          ...adminHeaders(),
-          params: effectiveClassId ? { class_id: effectiveClassId } : {},
-        }),
+        ...cls.data.map((k) =>
+          api.get("/admin/overview", { ...adminHeaders(), params: { class_id: k.id } })
+            .then((res) => ({ class_id: k.id, data: res.data }))
+        ),
       ]);
       setChildren(c.data);
       setWorkshops(w.data);
-      setOverview(o.data);
+      const map = {};
+      classOverviews.forEach((item) => {
+        map[item.class_id] = item.data;
+      });
+      setOverviewByClass(map);
     } catch (err) {
-      if (err.response?.status === 401) {
-        logout();
-        toast.error("Session expirée, reconnecte-toi.");
-      }
+      toast.error("Erreur de chargement");
     }
   };
 
   useEffect(() => {
-    if (authed) loadAll();
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, selectedClassId]);
+  }, [selectedClassId]);
 
   const addClass = async (e) => {
     e.preventDefault();
@@ -240,40 +224,6 @@ export default function AdminPage() {
     }
   };
 
-  if (!authed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" data-testid="admin-login-page">
-        <form onSubmit={login} className="kb-card p-8 md:p-10 w-full max-w-md space-y-6" data-testid="admin-login-form">
-          <div>
-            <h1 className="font-heading font-bold text-4xl mb-2">Espace Maîtresse</h1>
-            <p className="text-[#475569] text-lg">Entre le mot de passe pour continuer.</p>
-            <p className="text-sm text-[#64748B] mt-1">(par défaut : <code>maitresse</code>)</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pwd" className="text-lg font-heading">Mot de passe</Label>
-            <Input
-              id="pwd"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="h-14 text-xl rounded-2xl border-4 border-[#CBD5E1]"
-              data-testid="admin-password-input"
-              autoFocus
-            />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => navigate("/")} className="kb-btn kb-btn-ghost" data-testid="admin-cancel-btn">
-              <ArrowLeft className="w-4 h-4" /> Accueil
-            </button>
-            <button type="submit" className="kb-btn kb-btn-primary flex-1" data-testid="admin-login-btn">
-              Entrer
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen px-4 md:px-10 py-8 max-w-6xl mx-auto" data-testid="admin-page">
       <header className="flex items-center justify-between mb-8 gap-3 flex-wrap">
@@ -283,9 +233,6 @@ export default function AdminPage() {
           </button>
           <h1 className="font-heading font-bold text-3xl md:text-4xl">Espace Maîtresse</h1>
         </div>
-        <button onClick={logout} className="kb-btn kb-btn-ghost" data-testid="logout-btn">
-          <LogOut className="w-4 h-4" /> Déconnexion
-        </button>
       </header>
 
       <Tabs defaultValue="classes" className="w-full">
@@ -649,82 +596,88 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
-        {/* Overview Tab */}
+        {/* Overview Tab — all classes rendered back-to-back */}
         <TabsContent value="overview">
-          <div className="kb-card p-4 md:p-5 mb-6 flex items-center gap-3 flex-wrap">
-            <School className="w-6 h-6 text-[#475569] flex-shrink-0" />
-            <Label className="text-lg font-heading mb-0">Classe :</Label>
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="h-12 text-lg rounded-xl border-2 border-[#CBD5E1] px-4 bg-white font-bold flex-1 min-w-[200px]"
-              data-testid="overview-class-select"
-            >
-              {classes.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.emoji} {k.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="kb-card p-4 md:p-6 overflow-x-auto" data-testid="overview-table">
-            {!overview || overview.rows.length === 0 ? (
-              <p className="text-lg text-[#475569]">Aucune donnée.</p>
-            ) : (
-              <table className="w-full border-collapse min-w-[640px]">
-                <thead>
-                  <tr>
-                    <th className="text-left font-heading text-lg p-3 sticky left-0 bg-white">Enfant</th>
-                    {overview.workshops.map((w) => (
-                      <th key={w.id} className="p-3 font-heading text-base text-center min-w-[90px]">
-                        <div className="w-10 h-10 mx-auto rounded-xl border-2 border-[#E2E8F0] flex items-center justify-center text-2xl overflow-hidden" style={{ backgroundColor: w.color }}>
-                          {w.photo_url ? (
-                            <img src={photoSrc(w.photo_url)} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span>{w.emoji}</span>
-                          )}
-                        </div>
-                        <div className="text-sm text-[#475569] mt-1">{w.name}</div>
-                      </th>
-                    ))}
-                    <th className="p-3 font-heading text-base text-center">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.rows.map((row) => (
-                    <tr key={row.child.id} className="border-t-2 border-[#E2E8F0]">
-                      <td className="p-3 sticky left-0 bg-white">
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full bg-white border-2 border-[#E2E8F0] flex items-center justify-center text-2xl overflow-hidden flex-shrink-0" style={{ backgroundColor: row.child.color }}>
-                            {row.child.photo_url ? (
-                              <img src={photoSrc(row.child.photo_url)} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span>{row.child.emoji}</span>
-                            )}
-                          </div>
-                          <span className="font-bold">{row.child.name}</span>
-                        </div>
-                      </td>
-                      {overview.workshops.map((w) => {
-                        const done = row.done_workshop_ids.includes(w.id);
-                        return (
-                          <td key={w.id} className="p-3 text-center">
-                            {done ? (
-                              <Check className="w-6 h-6 mx-auto text-[#22C55E]" strokeWidth={3} />
-                            ) : (
-                              <X className="w-5 h-5 mx-auto text-[#CBD5E1]" />
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="p-3 text-center font-bold">
-                        {row.done_count}/{row.total}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          {classes.length === 0 && (
+            <p className="text-lg text-[#475569]">Aucune classe.</p>
+          )}
+          <div className="space-y-8" data-testid="overview-all-classes">
+            {classes.map((k) => {
+              const data = overviewByClass[k.id];
+              return (
+                <section key={k.id} data-testid={`overview-section-${k.name}`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div
+                      className="w-12 h-12 rounded-2xl border-4 border-white shadow-md flex items-center justify-center text-3xl"
+                      style={{ backgroundColor: k.color }}
+                    >
+                      {k.emoji}
+                    </div>
+                    <h3 className="font-heading font-bold text-2xl">{k.name}</h3>
+                  </div>
+
+                  <div className="kb-card p-4 md:p-6 overflow-x-auto" data-testid={`overview-table-${k.name}`}>
+                    {!data || data.rows.length === 0 ? (
+                      <p className="text-base text-[#475569]">Aucun enfant dans cette classe.</p>
+                    ) : (
+                      <table className="w-full border-collapse min-w-[640px]">
+                        <thead>
+                          <tr>
+                            <th className="text-left font-heading text-lg p-3 sticky left-0 bg-white">Enfant</th>
+                            {data.workshops.map((w) => (
+                              <th key={w.id} className="p-3 font-heading text-base text-center min-w-[90px]">
+                                <div className="w-10 h-10 mx-auto rounded-xl border-2 border-[#E2E8F0] flex items-center justify-center text-2xl overflow-hidden" style={{ backgroundColor: w.color }}>
+                                  {w.photo_url ? (
+                                    <img src={photoSrc(w.photo_url)} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{w.emoji}</span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-[#475569] mt-1">{w.name}</div>
+                              </th>
+                            ))}
+                            <th className="p-3 font-heading text-base text-center">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.rows.map((row) => (
+                            <tr key={row.child.id} className="border-t-2 border-[#E2E8F0]">
+                              <td className="p-3 sticky left-0 bg-white">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-10 h-10 rounded-full bg-white border-2 border-[#E2E8F0] flex items-center justify-center text-2xl overflow-hidden flex-shrink-0" style={{ backgroundColor: row.child.color }}>
+                                    {row.child.photo_url ? (
+                                      <img src={photoSrc(row.child.photo_url)} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{row.child.emoji}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-bold">{row.child.name}</span>
+                                </div>
+                              </td>
+                              {data.workshops.map((w) => {
+                                const done = row.done_workshop_ids.includes(w.id);
+                                return (
+                                  <td key={w.id} className="p-3 text-center">
+                                    {done ? (
+                                      <Check className="w-6 h-6 mx-auto text-[#22C55E]" strokeWidth={3} />
+                                    ) : (
+                                      <X className="w-5 h-5 mx-auto text-[#CBD5E1]" />
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="p-3 text-center font-bold">
+                                {row.done_count}/{row.total}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </TabsContent>
       </Tabs>

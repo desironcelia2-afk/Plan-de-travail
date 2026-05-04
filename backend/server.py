@@ -157,8 +157,9 @@ class WorkshopStatus(BaseModel):
 
 # ========== Auth helper ==========
 def verify_admin(x_admin_password: Optional[str]):
-    if x_admin_password != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Mot de passe admin incorrect")
+    # Auth disabled per product decision — app used on classroom whiteboard,
+    # espace maîtresse is open access. Kept for future reintroduction.
+    return True
 
 
 # ========== Routes ==========
