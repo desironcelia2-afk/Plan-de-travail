@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Trash2, Plus, LogOut, Check, X, Camera, ImageOff, School, Pencil } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, LogOut, Check, X, Camera, ImageOff, School, Pencil, FileDown } from "lucide-react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const CHILD_EMOJIS = ["🦊", "🐻", "🐰", "🦁", "🦄", "🐼", "🐨", "🐸", "🐵", "🦉", "🐯", "🐶", "🐱", "🐹", "🐻‍❄️"];
 const CHILD_COLORS = ["#FDE68A", "#BFDBFE", "#FBCFE8", "#FED7AA", "#DDD6FE", "#BBF7D0", "#FECACA", "#A7F3D0"];
@@ -61,6 +63,75 @@ export default function AdminPage() {
     class: { emojis: CLASS_EMOJIS, colors: CLASS_COLORS },
   };
   const editLabels = { child: "l'enfant", workshop: "l'atelier", class: "la classe" };
+
+  const exportSuiviPdf = () => {
+    if (classes.length === 0) return toast.error("Aucune classe à exporter");
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      const today = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+      let isFirst = true;
+
+      classes.forEach((k) => {
+        const data = overviewByClass[k.id];
+        if (!isFirst) doc.addPage();
+        isFirst = false;
+
+        // Header
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text(`Suivi des ateliers — ${k.name}`, 40, 40);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Exporté le ${today}`, 40, 58);
+        doc.setTextColor(0);
+
+        if (!data || data.rows.length === 0) {
+          doc.setFontSize(12);
+          doc.text("Aucun enfant dans cette classe.", 40, 90);
+          return;
+        }
+
+        const head = [["Enfant", ...data.workshops.map((w) => w.name), "Total"]];
+        const body = data.rows.map((row) => [
+          row.child.name,
+          ...data.workshops.map((w) => (row.done_workshop_ids.includes(w.id) ? "✓" : "·")),
+          `${row.done_count}/${row.total}`,
+        ]);
+
+        autoTable(doc, {
+          head,
+          body,
+          startY: 75,
+          styles: { fontSize: 10, cellPadding: 6, halign: "center", valign: "middle" },
+          headStyles: { fillColor: [14, 165, 233], textColor: 255, fontStyle: "bold" },
+          columnStyles: {
+            0: { halign: "left", fontStyle: "bold", cellWidth: 110 },
+          },
+          didParseCell: (cellData) => {
+            // Color done cells light green
+            if (cellData.section === "body" && cellData.column.index > 0 && cellData.column.index < head[0].length - 1) {
+              if (cellData.cell.raw === "✓") {
+                cellData.cell.styles.fillColor = [220, 252, 231];
+                cellData.cell.styles.textColor = [22, 101, 52];
+                cellData.cell.styles.fontStyle = "bold";
+              } else {
+                cellData.cell.styles.textColor = [180, 180, 180];
+              }
+            }
+          },
+          margin: { left: 40, right: 40 },
+        });
+      });
+
+      const filename = `suivi-ateliers-${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
+      toast.success("PDF exporté");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur d'export PDF");
+    }
+  };
 
   const login = () => {}; // auth disabled
   const logout = () => {}; // auth disabled
@@ -598,6 +669,18 @@ export default function AdminPage() {
 
         {/* Overview Tab — all classes rendered back-to-back */}
         <TabsContent value="overview">
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <h2 className="font-heading font-bold text-2xl">Suivi par classe</h2>
+            {classes.length > 0 && (
+              <button
+                onClick={exportSuiviPdf}
+                className="kb-btn kb-btn-primary"
+                data-testid="export-pdf-btn"
+              >
+                <FileDown className="w-5 h-5" /> Exporter en PDF
+              </button>
+            )}
+          </div>
           {classes.length === 0 && (
             <p className="text-lg text-[#475569]">Aucune classe.</p>
           )}
