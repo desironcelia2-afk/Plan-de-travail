@@ -17,6 +17,72 @@ const WS_COLORS = ["#EF4444", "#3B82F6", "#FACC15", "#22C55E", "#6B7280", "#9240
 const CLASS_EMOJIS = ["🏫", "🌈", "🌟", "🦋", "🐝", "🌻", "🍎", "🚂", "🎈", "🐙"];
 const CLASS_COLORS = ["#DBEAFE", "#FEF3C7", "#D1FAE5", "#FCE7F3", "#E9D5FF", "#FED7AA"];
 
+// Reusable emoji + color pickers with free-text / color-picker fallback
+function EmojiPicker({ palette, value, onChange, testIdPrefix = "" }) {
+  return (
+    <div>
+      <Label className="text-base">Emoji</Label>
+      <div className="flex gap-2 flex-wrap mt-1 items-center">
+        {palette.map((em) => (
+          <button
+            type="button"
+            key={em}
+            onClick={() => onChange(em)}
+            className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
+              value === em ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
+            }`}
+          >
+            {em}
+          </button>
+        ))}
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="ou tape 😊"
+          maxLength={4}
+          className="h-12 w-32 text-2xl text-center rounded-xl border-4 border-dashed border-[#94A3B8] bg-white focus:border-[#0EA5E9] focus:outline-none"
+          data-testid={testIdPrefix ? `${testIdPrefix}-emoji-custom` : undefined}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ColorPicker({ palette, value, onChange, testIdPrefix = "" }) {
+  return (
+    <div>
+      <Label className="text-base">Couleur</Label>
+      <div className="flex gap-2 flex-wrap mt-1 items-center">
+        {palette.map((c) => (
+          <button
+            type="button"
+            key={c}
+            onClick={() => onChange(c)}
+            className={`w-10 h-10 rounded-full border-4 ${value === c ? "border-[#0F172A]" : "border-white"}`}
+            style={{ backgroundColor: c }}
+            aria-label={c}
+          />
+        ))}
+        <label
+          className="w-10 h-10 rounded-full border-4 border-dashed border-[#94A3B8] cursor-pointer flex items-center justify-center overflow-hidden relative"
+          title="Choisir une couleur personnalisée"
+          style={{ backgroundColor: palette.includes(value) ? "transparent" : value }}
+        >
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            data-testid={testIdPrefix ? `${testIdPrefix}-color-custom` : undefined}
+          />
+          {palette.includes(value) && <span className="text-lg">🎨</span>}
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const [classes, setClasses] = useState([]);
@@ -328,38 +394,18 @@ export default function AdminPage() {
                 data-testid="new-class-name"
               />
             </div>
-            <div>
-              <Label className="text-base">Icône</Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {CLASS_EMOJIS.map((e) => (
-                  <button
-                    type="button"
-                    key={e}
-                    onClick={() => setNewClass({ ...newClass, emoji: e })}
-                    className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
-                      newClass.emoji === e ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
-                    }`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label className="text-base">Couleur</Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {CLASS_COLORS.map((c) => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => setNewClass({ ...newClass, color: c })}
-                    className={`w-10 h-10 rounded-full border-4 ${newClass.color === c ? "border-[#0F172A]" : "border-white"}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={c}
-                  />
-                ))}
-              </div>
-            </div>
+            <EmojiPicker
+              palette={CLASS_EMOJIS}
+              value={newClass.emoji}
+              onChange={(em) => setNewClass({ ...newClass, emoji: em })}
+              testIdPrefix="new-class"
+            />
+            <ColorPicker
+              palette={CLASS_COLORS}
+              value={newClass.color}
+              onChange={(c) => setNewClass({ ...newClass, color: c })}
+              testIdPrefix="new-class"
+            />
             <button type="submit" className="kb-btn kb-btn-primary" data-testid="add-class-btn">
               <Plus className="w-5 h-5" /> Ajouter la classe
             </button>
@@ -431,38 +477,18 @@ export default function AdminPage() {
                 />
               </div>
             </div>
-            <div>
-              <Label className="text-base">Emoji</Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {CHILD_EMOJIS.map((e) => (
-                  <button
-                    type="button"
-                    key={e}
-                    onClick={() => setNewChild({ ...newChild, emoji: e })}
-                    className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
-                      newChild.emoji === e ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
-                    }`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label className="text-base">Couleur</Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {CHILD_COLORS.map((c) => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => setNewChild({ ...newChild, color: c })}
-                    className={`w-10 h-10 rounded-full border-4 ${newChild.color === c ? "border-[#0F172A]" : "border-white"}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={c}
-                  />
-                ))}
-              </div>
-            </div>
+            <EmojiPicker
+              palette={CHILD_EMOJIS}
+              value={newChild.emoji}
+              onChange={(em) => setNewChild({ ...newChild, emoji: em })}
+              testIdPrefix="new-child"
+            />
+            <ColorPicker
+              palette={CHILD_COLORS}
+              value={newChild.color}
+              onChange={(c) => setNewChild({ ...newChild, color: c })}
+              testIdPrefix="new-child"
+            />
             <button type="submit" className="kb-btn kb-btn-primary" data-testid="add-child-btn">
               <Plus className="w-5 h-5" /> Ajouter
             </button>
@@ -556,38 +582,18 @@ export default function AdminPage() {
                 data-testid="new-workshop-name"
               />
             </div>
-            <div>
-              <Label className="text-base">Icône</Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {WS_EMOJIS.map((e) => (
-                  <button
-                    type="button"
-                    key={e}
-                    onClick={() => setNewWs({ ...newWs, emoji: e })}
-                    className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
-                      newWs.emoji === e ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
-                    }`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label className="text-base">Couleur</Label>
-              <div className="flex gap-2 flex-wrap mt-1">
-                {WS_COLORS.map((c) => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => setNewWs({ ...newWs, color: c })}
-                    className={`w-10 h-10 rounded-full border-4 ${newWs.color === c ? "border-[#0F172A]" : "border-white"}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={c}
-                  />
-                ))}
-              </div>
-            </div>
+            <EmojiPicker
+              palette={WS_EMOJIS}
+              value={newWs.emoji}
+              onChange={(em) => setNewWs({ ...newWs, emoji: em })}
+              testIdPrefix="new-workshop"
+            />
+            <ColorPicker
+              palette={WS_COLORS}
+              value={newWs.color}
+              onChange={(c) => setNewWs({ ...newWs, color: c })}
+              testIdPrefix="new-workshop"
+            />
             <button type="submit" className="kb-btn kb-btn-primary" data-testid="add-workshop-btn">
               <Plus className="w-5 h-5" /> Ajouter
             </button>
@@ -803,39 +809,18 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <div>
-                <Label className="text-base">Emoji</Label>
-                <div className="flex gap-2 flex-wrap mt-1 max-h-32 overflow-y-auto">
-                  {editPalettes[editing.kind].emojis.map((em) => (
-                    <button
-                      type="button"
-                      key={em}
-                      onClick={() => setEditing({ ...editing, emoji: em })}
-                      className={`w-12 h-12 rounded-xl border-4 text-2xl flex items-center justify-center ${
-                        editing.emoji === em ? "border-[#0EA5E9] bg-[#E0F2FE]" : "border-[#CBD5E1] bg-white"
-                      }`}
-                    >
-                      {em}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-base">Couleur</Label>
-                <div className="flex gap-2 flex-wrap mt-1">
-                  {editPalettes[editing.kind].colors.map((col) => (
-                    <button
-                      type="button"
-                      key={col}
-                      onClick={() => setEditing({ ...editing, color: col })}
-                      className={`w-10 h-10 rounded-full border-4 ${editing.color === col ? "border-[#0F172A]" : "border-white"}`}
-                      style={{ backgroundColor: col }}
-                      aria-label={col}
-                    />
-                  ))}
-                </div>
-              </div>
+              <EmojiPicker
+                palette={editPalettes[editing.kind].emojis}
+                value={editing.emoji}
+                onChange={(em) => setEditing({ ...editing, emoji: em })}
+                testIdPrefix="edit"
+              />
+              <ColorPicker
+                palette={editPalettes[editing.kind].colors}
+                value={editing.color}
+                onChange={(c) => setEditing({ ...editing, color: c })}
+                testIdPrefix="edit"
+              />
 
               <DialogFooter className="gap-2 sm:gap-2">
                 <button type="button" onClick={closeEdit} className="kb-btn kb-btn-ghost" data-testid="edit-cancel-btn">
